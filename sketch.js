@@ -1,46 +1,71 @@
-let handPose;
-let video;
-let hands = [];
-let results = [];
+// Sélection des éléments HTML
+const videoElement = document.getElementsByClassName("input_video")[0];
+const canvasElement = document.getElementsByClassName("output_canvas")[0];
+const canvasCtx = canvasElement.getContext("2d");
 
-function preload() {
-  // Load the handPose model
-  handPose = ml5.handPose();
-}
+// Création de l'instance de MediaPipe Hands
+const hands = new Hands({
+  locateFile: (file) => {
+    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+  }
+});
 
-function setup() {
-  createCanvas(640, 480);
-  // Create the webcam video and hide it
-  video = createCapture(VIDEO);
-  video.size(640, 480);
-  video.hide();
-  // start detecting hands from the webcam video
-  handPose.detectStart(video, gotHands);
-}
+// Configuration des options, ici on définit maxNumHands à 10
+hands.setOptions({
+  maxNumHands: 1000,            // Nombre maximum de mains à détecter
+  modelComplexity: 1,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5
+});
 
-function draw() {
-  // Draw the webcam video
-  image(video, 0, 0, width, height);
+// Callback : fonction appelée à chaque résultat détecté
+function onResults(results) {
+  // Sauvegarde de l'état du canvas
+  canvasCtx.save();
+  // Efface le canvas
+  canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+  // Dessine l'image de la vidéo en fond
+  canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-  fill(255);
-  textSize(24);
-  text("Mains détectées : " + hands.length, 10, height - 20);
+  // Initialisation du compteur de mains détectées
+  let nbMains = 0;
 
-  // Draw all the tracked hand points
-  for (let i = 0; i < hands.length; i++) {
-    let hand = hands[i];
-    for (let j = 0; j < hand.keypoints.length; j++) {
-      let keypoint = hand.keypoints[j];
-      fill(0, 255, 0);
-      noStroke();
-      circle(keypoint.x, keypoint.y, 10);
+  // Si des mains ont été détectées, on dessine les repères
+  if (results.multiHandLandmarks) {
+    nbMains = results.multiHandLandmarks.length; // On compte le nombre de mains
+    for (const landmarks of results.multiHandLandmarks) {
+      // Dessine les connexions entre les repères
+      drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {
+        color: '#00FF00',
+        lineWidth: 5
+      });
+      // Dessine les points des repères
+      drawLandmarks(canvasCtx, landmarks, {
+        color: '#FF0000',
+        lineWidth: 2
+      });
     }
   }
+
+  // Affichage du compteur de mains sur le canvas
+  canvasCtx.font = "24px Arial";
+  canvasCtx.fillStyle = "black";
+  canvasCtx.fillText("Mains détectées: " + nbMains, 10, 470);
+  
+  // Restauration du contexte du canvas
+  canvasCtx.restore();
 }
 
-// Callback function for when handPose outputs data
-function gotHands(results) {
-  // save the output to the hands variable
-  hands = results;
-  console.log("Nombre de mains détectées :", hands.length);
-}
+// Attache la fonction onResults à l'instance hands
+hands.onResults(onResults);
+
+// Utilisation de Camera pour gérer le flux webcam
+const camera = new Camera(videoElement, {
+  onFrame: async () => {
+    await hands.send({ image: videoElement });
+  },
+  width: 640,
+  height: 480
+});
+camera.start();
+// On a testé en ml5.js pour compter plusieurs mains mais ml5.js ne peut pas me permettre de compter + de 2 mains, donc on est passé par MediaPipeHands
