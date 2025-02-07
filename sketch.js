@@ -1,6 +1,7 @@
 let handPose;
 let video;
 let hands = [];
+let results = [];
 
 function preload() {
   // Load the handPose model
@@ -21,6 +22,10 @@ function draw() {
   // Draw the webcam video
   image(video, 0, 0, width, height);
 
+  fill(255);
+  textSize(24);
+  text("Mains détectées : " + hands.length, 10, height - 20);
+
   // Draw all the tracked hand points
   for (let i = 0; i < hands.length; i++) {
     let hand = hands[i];
@@ -37,4 +42,5 @@ function draw() {
 function gotHands(results) {
   // save the output to the hands variable
   hands = results;
+  console.log("Nombre de mains détectées :", hands.length);
 }
